@@ -1,2 +1,4 @@
 .env
-venv 
+venv
+stt_model/*
+tts_model/*

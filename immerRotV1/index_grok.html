@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Red Card Prediction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=EB+Garamond:wght@400;600&display=swap');
+
+        body {
+            background: linear-gradient(180deg, #0a0508, #1a0f14);
+            font-family: 'EB Garamond', serif;
+        }
+
+        .title {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .card {
+            width: 110px;
+            height: 154px;
+            perspective: 1200px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.9s cubic-bezier(0.25, 0.1, 0.25, 1);
+            transform-style: preserve-3d;
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 14px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+        }
+
+        .card-back.red {
+            background: linear-gradient(135deg, #b91c1c, #f87171);
+        }
+
+        .card-front {
+            background: #f8fafc;
+            transform: rotateY(180deg);
+            border: 8px solid #111827;
+        }
+
+        .highlight {
+            animation: highlightPulse 1.4s ease-in-out 2;
+            box-shadow: 0 0 0 12px rgba(234, 179, 8, 0.7) !important;
+        }
+
+        @keyframes highlightPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.9); }
+            50% { box-shadow: 0 0 0 25px rgba(234, 179, 8, 0); }
+        }
+
+        .velvet-table {
+            background: radial-gradient(circle at center, #2a1a1f 0%, #1a0f14 70%);
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.95);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-amber-100">
+    <div class="max-w-6xl mx-auto px-6 py-12">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-12">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-red-700 to-rose-600 rounded-2xl flex items-center justify-center text-4xl shadow-2xl">🃏</div>
+                <div>
+                    <h1 class="title text-6xl font-bold tracking-tighter text-white">RED CARD</h1>
+                    <p class="text-red-400 text-xl -mt-2">PREDICTION</p>
+                </div>
+            </div>
+            
+            <div id="api-key-section" class="flex items-center gap-3 bg-zinc-900 px-6 py-3 rounded-3xl">
+                <input id="gemini-key" type="password" placeholder="Gemini API Key" 
+                       class="bg-transparent border border-zinc-700 focus:border-red-500 px-5 py-3 rounded-2xl text-sm outline-none w-80 font-mono">
+                <button onclick="saveApiKey()" 
+                        class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-2xl text-sm font-medium transition-all active:scale-95">
+                    SPEICHERN
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-10">
+            <!-- Magic Table -->
+            <div class="col-span-12 lg:col-span-7">
+                <div class="velvet-table rounded-3xl p-10 border border-amber-900/30">
+                    <div class="text-center mb-8">
+                        <div class="inline-flex bg-black/70 px-8 py-3 rounded-full text-sm tracking-widest text-amber-300">
+                            <i class="fas fa-table mr-2"></i> DER MAGISCHE TISCH
+                        </div>
+                    </div>
+
+                    <div id="cards" class="flex justify-center gap-8 flex-wrap"></div>
+
+                    <div class="mt-16 flex justify-center">
+                        <div class="text-center">
+                            <p class="text-amber-300/70 text-sm mb-4 tracking-widest">WÄHLE DEINE ZAHL (1–6)</p>
+                            <div id="number-pad" class="grid grid-cols-6 gap-4 max-w-xs mx-auto"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Magician's Scroll -->
+            <div class="col-span-12 lg:col-span-5">
+                <div class="bg-zinc-900/90 border border-amber-900/50 rounded-3xl p-8 h-full flex flex-col">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="text-5xl">🔮</div>
+                        <div class="title text-4xl font-bold text-white">Der Magier spricht</div>
+                    </div>
+
+                    <div id="speech-scroll" 
+                         class="flex-1 bg-black/70 border border-amber-800/50 rounded-2xl p-8 text-lg leading-relaxed overflow-auto min-h-[260px] italic">
+                        Gib deinen Gemini API-Key ein und wähle eine Zahl, um das Wunder zu erleben...
+                    </div>
+
+                    <button onclick="resetTrick()" 
+                            class="mt-8 w-full py-4 bg-zinc-800 hover:bg-zinc-700 transition-colors rounded-2xl text-sm font-medium flex items-center justify-center gap-3">
+                        <i class="fas fa-rotate"></i>
+                        TRICK NEU STARTEN
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 text-center text-xs text-amber-400/60">
+            Equivoque • Magician's Choice • Immer die rote Karte<br>
+            Karte 1 (Ass♠) = roter Rücken • Karte 3 (Herz 6) = rotes Gesicht
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
+
+        let genAI = null;
+        let apiKey = localStorage.getItem("geminiKey") || "";
+
+        const cardsState = [
+            { id: 1, value: "A", suit: "♠", face: "black", back: "red" },
+            { id: 2, value: "2", suit: "♠", face: "black", back: "blue" },
+            { id: 3, value: "6", suit: "♥", face: "red",   back: "blue" },
+            { id: 4, value: "5", suit: "♠", face: "black", back: "blue" },
+            { id: 5, value: "3", suit: "♠", face: "black", back: "blue" },
+            { id: 6, value: "4", suit: "♠", face: "black", back: "blue" }
+        ];
+
+        function initGemini() {
+            if (apiKey && !genAI) {
+                genAI = new GoogleGenerativeAI(apiKey);
+                document.getElementById("api-key-section").style.opacity = "0.6";
+            }
+        }
+
+        window.saveApiKey = function() {
+            const input = document.getElementById("gemini-key");
+            apiKey = input.value.trim();
+            if (apiKey.length > 10) {
+                localStorage.setItem("geminiKey", apiKey);
+                initGemini();
+                alert("✅ Gemini API-Key gespeichert!\n\nDer Magier ist nun bereit.");
+            } else {
+                alert("Bitte einen gültigen Gemini API-Key eingeben.");
+            }
+        };
+
+        function createCard(card) {
+            const div = document.createElement("div");
+            div.className = "card";
+            div.id = `card-${card.id}`;
+            
+            div.innerHTML = `
+                <div class="card-inner">
+                    <div class="card-back ${card.back === 'red' ? 'red' : ''}">
+                        <div class="text-5xl font-black tracking-widest opacity-20">RED</div>
+                    </div>
+                    <div class="card-front">
+                        <div class="text-8xl ${card.face === 'red' ? 'text-red-600' : 'text-black'}">${card.suit}</div>
+                        <div class="absolute top-5 left-5 text-4xl font-bold ${card.face === 'red' ? 'text-red-600' : 'text-zinc-900'}">${card.value}</div>
+                        <div class="absolute bottom-5 right-5 text-4xl font-bold rotate-180 ${card.face === 'red' ? 'text-red-600' : 'text-zinc-900'}">${card.value}</div>
+                    </div>
+                </div>
+            `;
+            return div;
+        }
+
+        function renderCards() {
+            const container = document.getElementById("cards");
+            container.innerHTML = "";
+            cardsState.forEach(card => container.appendChild(createCard(card)));
+        }
+
+        function renderNumberPad() {
+            const container = document.getElementById("number-pad");
+            container.innerHTML = "";
+            for (let i = 1; i <= 6; i++) {
+                const btn = document.createElement("button");
+                btn.className = `aspect-square bg-zinc-900 hover:bg-red-900 border border-amber-800 hover:border-red-500 text-4xl font-bold rounded-2xl transition-all active:scale-95 shadow-inner`;
+                btn.textContent = i;
+                btn.onclick = () => performTrick(i);
+                container.appendChild(btn);
+            }
+        }
+
+        async function performTrick(chosenNumber) {
+            if (!genAI) {
+                alert("Bitte zuerst deinen Gemini API-Key oben eingeben und speichern.");
+                return;
+            }
+
+            // Disable buttons
+            document.querySelectorAll("#number-pad button").forEach(b => b.disabled = true);
+
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+            const prompt = `You are a master magician performing "The Red Card Prediction".
+Spectator chose number ${chosenNumber}.
+
+Cards positions 1 to 6 from left to right:
+- Card 1: Ace of Spades → Red Back
+- Card 3: Six of Hearts → Red Face
+- All others: Blue Back, Black Face
+
+Rules:
+- If number is 1, 2 or 5 → you MUST land on Card 1 (red back)
+- If number is 3, 4 or 6 → you MUST land on Card 3 (red face)
+
+Return ONLY valid JSON (no extra text):
+{
+  "magician_speech": "poetic, mysterious explanation in German",
+  "counting_path": [array of positions 1-6 showing the counting order, last one is the target],
+  "reveal_type": "back" or "face"
+}`;
+
+            try {
+                document.getElementById("speech-scroll").innerHTML = `<span class="text-amber-400">Der Magier denkt nach...</span>`;
+
+                const result = await model.generateContent(prompt);
+                let text = result.response.text().trim();
+
+                // Clean JSON
+                if (text.includes("```json")) text = text.split("```json")[1].split("```")[0];
+                if (text.includes("```")) text = text.split("```")[1];
+
+                const data = JSON.parse(text);
+
+                // Show speech
+                document.getElementById("speech-scroll").innerHTML = `
+                    <span class="text-red-300 block text-xl leading-relaxed">"${data.magician_speech}"</span>
+                    <span class="text-xs text-amber-400 mt-6 block">— Der Magier</span>
+                `;
+
+                // Visual counting
+                await visualCount(data.counting_path);
+
+                // Final reveal
+                await finalReveal(data.reveal_type);
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById("speech-scroll").innerHTML = `
+                    <span class="text-red-400">Etwas ist schiefgelaufen...<br>Versuche es erneut.</span>
+                `;
+            }
+        }
+
+        async function visualCount(path) {
+            for (const pos of path) {
+                const card = document.getElementById(`card-${pos}`);
+                if (card) {
+                    card.classList.add("highlight");
+                    await new Promise(resolve => setTimeout(resolve, 700));
+                    card.classList.remove("highlight");
+                }
+            }
+        }
+
+        async function finalReveal(type) {
+            const allCards = document.querySelectorAll(".card");
+            
+            allCards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add("flipped");
+                }, index * 90);
+            });
+
+            // Glow on red element
+            setTimeout(() => {
+                if (type === "back") {
+                    document.getElementById("card-1").style.boxShadow = "0 0 70px #f87171";
+                } else {
+                    document.getElementById("card-3").style.boxShadow = "0 0 70px #f87171";
+                }
+            }, 1200);
+        }
+
+        window.resetTrick = function() {
+            document.querySelectorAll(".card").forEach(card => {
+                card.classList.remove("flipped");
+                card.style.boxShadow = "";
+            });
+            
+            document.getElementById("speech-scroll").innerHTML = 
+                "Wähle eine Zahl 1–6 und erlebe echte KI-Magie...";
+            
+            document.querySelectorAll("#number-pad button").forEach(b => b.disabled = false);
+        };
+
+        // Initialize everything
+        window.onload = () => {
+            renderCards();
+            renderNumberPad();
+            initGemini();
+
+            if (!apiKey) {
+ <!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Red Card Prediction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=EB+Garamond:wght@400;600&display=swap');
+
+        body {
+            background: linear-gradient(180deg, #0a0508, #1a0f14);
+            font-family: 'EB Garamond', serif;
+        }
+
+        .title {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .card {
+            width: 110px;
+            height: 154px;
+            perspective: 1200px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.9s cubic-bezier(0.25, 0.1, 0.25, 1);
+            transform-style: preserve-3d;
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 14px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+        }
+
+        .card-back.red {
+            background: linear-gradient(135deg, #b91c1c, #f87171);
+        }
+
+        .card-front {
+            background: #f8fafc;
+            transform: rotateY(180deg);
+            border: 8px solid #111827;
+        }
+
+        .highlight {
+            animation: highlightPulse 1.4s ease-in-out 2;
+            box-shadow: 0 0 0 12px rgba(234, 179, 8, 0.7) !important;
+        }
+
+        @keyframes highlightPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.9); }
+            50% { box-shadow: 0 0 0 25px rgba(234, 179, 8, 0); }
+        }
+
+        .velvet-table {
+            background: radial-gradient(circle at center, #2a1a1f 0%, #1a0f14 70%);
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.95);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-amber-100">
+    <div class="max-w-6xl mx-auto px-6 py-12">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-12">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-red-700 to-rose-600 rounded-2xl flex items-center justify-center text-4xl shadow-2xl">🃏</div>
+                <div>
+                    <h1 class="title text-6xl font-bold tracking-tighter text-white">RED CARD</h1>
+                    <p class="text-red-400 text-xl -mt-2">PREDICTION</p>
+                </div>
+            </div>
+            
+            <div id="api-key-section" class="flex items-center gap-3 bg-zinc-900 px-6 py-3 rounded-3xl">
+                <input id="gemini-key" type="password" placeholder="Gemini API Key" 
+                       class="bg-transparent border border-zinc-700 focus:border-red-500 px-5 py-3 rounded-2xl text-sm outline-none w-80 font-mono">
+                <button onclick="saveApiKey()" 
+                        class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-2xl text-sm font-medium transition-all active:scale-95">
+                    SPEICHERN
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-10">
+            <!-- Magic Table -->
+            <div class="col-span-12 lg:col-span-7">
+                <div class="velvet-table rounded-3xl p-10 border border-amber-900/30">
+                    <div class="text-center mb-8">
+                        <div class="inline-flex bg-black/70 px-8 py-3 rounded-full text-sm tracking-widest text-amber-300">
+                            <i class="fas fa-table mr-2"></i> DER MAGISCHE TISCH
+                        </div>
+                    </div>
+
+                    <div id="cards" class="flex justify-center gap-8 flex-wrap"></div>
+
+                    <div class="mt-16 flex justify-center">
+                        <div class="text-center">
+                            <p class="text-amber-300/70 text-sm mb-4 tracking-widest">WÄHLE DEINE ZAHL (1–6)</p>
+                            <div id="number-pad" class="grid grid-cols-6 gap-4 max-w-xs mx-auto"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Magician's Scroll -->
+            <div class="col-span-12 lg:col-span-5">
+                <div class="bg-zinc-900/90 border border-amber-900/50 rounded-3xl p-8 h-full flex flex-col">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="text-5xl">🔮</div>
+                        <div class="title text-4xl font-bold text-white">Der Magier spricht</div>
+                    </div>
+
+                    <div id="speech-scroll" 
+                         class="flex-1 bg-black/70 border border-amber-800/50 rounded-2xl p-8 text-lg leading-relaxed overflow-auto min-h-[260px] italic">
+                        Gib deinen Gemini API-Key ein und wähle eine Zahl, um das Wunder zu erleben...
+                    </div>
+
+                    <button onclick="resetTrick()" 
+                            class="mt-8 w-full py-4 bg-zinc-800 hover:bg-zinc-700 transition-colors rounded-2xl text-sm font-medium flex items-center justify-center gap-3">
+                        <i class="fas fa-rotate"></i>
+                        TRICK NEU STARTEN
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 text-center text-xs text-amber-400/60">
+            Equivoque • Magician's Choice • Immer die rote Karte<br>
+            Karte 1 (Ass♠) = roter Rücken • Karte 3 (Herz 6) = rotes Gesicht
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
+
+        let genAI = null;
+        let apiKey = localStorage.getItem("geminiKey") || "";
+
+        const cardsState = [
+            { id: 1, value: "A", suit: "♠", face: "black", back: "red" },
+            { id: 2, value: "2", suit: "♠", face: "black", back: "blue" },
+            { id: 3, value: "6", suit: "♥", face: "red",   back: "blue" },
+            { id: 4, value: "5", suit: "♠", face: "black", back: "blue" },
+            { id: 5, value: "3", suit: "♠", face: "black", back: "blue" },
+            { id: 6, value: "4", suit: "♠", face: "black", back: "blue" }
+        ];
+
+        function initGemini() {
+            if (apiKey && !genAI) {
+                genAI = new GoogleGenerativeAI(apiKey);
+                document.getElementById("api-key-section").style.opacity = "0.6";
+            }
+        }
+
+        window.saveApiKey = function() {
+            const input = document.getElementById("gemini-key");
+            apiKey = input.value.trim();
+            if (apiKey.length > 10) {
+                localStorage.setItem("geminiKey", apiKey);
+                initGemini();
+                alert("✅ Gemini API-Key gespeichert!\n\nDer Magier ist nun bereit.");
+            } else {
+                alert("Bitte einen gültigen Gemini API-Key eingeben.");
+            }
+        };
+
+        function createCard(card) {
+            const div = document.createElement("div");
+            div.className = "card";
+            div.id = `card-${card.id}`;
+            
+            div.innerHTML = `
+                <div class="card-inner">
+                    <div class="card-back ${card.back === 'red' ? 'red' : ''}">
+                        <div class="text-5xl font-black tracking-widest opacity-20">RED</div>
+                    </div>
+                    <div class="card-front">
+                        <div class="text-8xl ${card.face === 'red' ? 'text-red-600' : 'text-black'}">${card.suit}</div>
+                        <div class="absolute top-5 left-5 text-4xl font-bold ${card.face === 'red' ? 'text-red-600' : 'text-zinc-900'}">${card.value}</div>
+                        <div class="absolute bottom-5 right-5 text-4xl font-bold rotate-180 ${card.face === 'red' ? 'text-red-600' : 'text-zinc-900'}">${card.value}</div>
+                    </div>
+                </div>
+            `;
+            return div;
+        }
+
+        function renderCards() {
+            const container = document.getElementById("cards");
+            container.innerHTML = "";
+            cardsState.forEach(card => container.appendChild(createCard(card)));
+        }
+
+        function renderNumberPad() {
+            const container = document.getElementById("number-pad");
+            container.innerHTML = "";
+            for (let i = 1; i <= 6; i++) {
+                const btn = document.createElement("button");
+                btn.className = `aspect-square bg-zinc-900 hover:bg-red-900 border border-amber-800 hover:border-red-500 text-4xl font-bold rounded-2xl transition-all active:scale-95 shadow-inner`;
+                btn.textContent = i;
+                btn.onclick = () => performTrick(i);
+                container.appendChild(btn);
+            }
+        }
+
+        async function performTrick(chosenNumber) {
+            if (!genAI) {
+                alert("Bitte zuerst deinen Gemini API-Key oben eingeben und speichern.");
+                return;
+            }
+
+            // Disable buttons
+            document.querySelectorAll("#number-pad button").forEach(b => b.disabled = true);
+
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+            const prompt = `You are a master magician performing "The Red Card Prediction".
+Spectator chose number ${chosenNumber}.
+
+Cards positions 1 to 6 from left to right:
+- Card 1: Ace of Spades → Red Back
+- Card 3: Six of Hearts → Red Face
+- All others: Blue Back, Black Face
+
+Rules:
+- If number is 1, 2 or 5 → you MUST land on Card 1 (red back)
+- If number is 3, 4 or 6 → you MUST land on Card 3 (red face)
+
+Return ONLY valid JSON (no extra text):
+{
+  "magician_speech": "poetic, mysterious explanation in German",
+  "counting_path": [array of positions 1-6 showing the counting order, last one is the target],
+  "reveal_type": "back" or "face"
+}`;
+
+            try {
+                document.getElementById("speech-scroll").innerHTML = `<span class="text-amber-400">Der Magier denkt nach...</span>`;
+
+                const result = await model.generateContent(prompt);
+                let text = result.response.text().trim();
+
+                // Clean JSON
+                if (text.includes("```json")) text = text.split("```json")[1].split("```")[0];
+                if (text.includes("```")) text = text.split("```")[1];
+
+                const data = JSON.parse(text);
+
+                // Show speech
+                document.getElementById("speech-scroll").innerHTML = `
+                    <span class="text-red-300 block text-xl leading-relaxed">"${data.magician_speech}"</span>
+                    <span class="text-xs text-amber-400 mt-6 block">— Der Magier</span>
+                `;
+
+                // Visual counting
+                await visualCount(data.counting_path);
+
+                // Final reveal
+                await finalReveal(data.reveal_type);
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById("speech-scroll").innerHTML = `
+                    <span class="text-red-400">Etwas ist schiefgelaufen...<br>Versuche es erneut.</span>
+                `;
+            }
+        }
+
+        async function visualCount(path) {
+            for (const pos of path) {
+                const card = document.getElementById(`card-${pos}`);
+                if (card) {
+                    card.classList.add("highlight");
+                    await new Promise(resolve => setTimeout(resolve, 700));
+                    card.classList.remove("highlight");
+                }
+            }
+        }
+
+        async function finalReveal(type) {
+            const allCards = document.querySelectorAll(".card");
+            
+            allCards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add("flipped");
+                }, index * 90);
+            });
+
+            // Glow on red element
+            setTimeout(() => {
+                if (type === "back") {
+                    document.getElementById("card-1").style.boxShadow = "0 0 70px #f87171";
+                } else {
+                    document.getElementById("card-3").style.boxShadow = "0 0 70px #f87171";
+                }
+            }, 1200);
+        }
+
+        window.resetTrick = function() {
+            document.querySelectorAll(".card").forEach(card => {
+                card.classList.remove("flipped");
+                card.style.boxShadow = "";
+            });
+            
+            document.getElementById("speech-scroll").innerHTML = 
+                "Wähle eine Zahl 1–6 und erlebe echte KI-Magie...";
+            
+            document.querySelectorAll("#number-pad button").forEach(b => b.disabled = false);
+        };
+
+        // Initialize everything
+        window.onload = () => {
+            renderCards();
+            renderNumberPad();
+            initGemini();
+
+            if (!apiKey) {
+                document.getElementById("speech-scroll").innerHTML = 
+                    "Willkommen zur <strong>Red Card Prediction</strong>!<br><br>Trage oben deinen Gemini API-Key ein.";
+            }
+        };
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Red Card Prediction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=EB+Garamond:wght@400;600&display=swap');
+
+        body {
+            background: linear-gradient(180deg, #0a0508, #1a0f14);
+            font-family: 'EB Garamond', serif;
+        }
+
+        .title {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .card {
+            width: 110px;
+            height: 154px;
+            perspective: 1200px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.9s cubic-bezier(0.25, 0.1, 0.25, 1);
+            transform-style: preserve-3d;
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 14px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+        }
+
+        .card-back.red {
+            background: linear-gradient(135deg, #b91c1c, #f87171);
+        }
+
+        .card-front {
+            background: #f8fafc;
+            transform: rotateY(180deg);
+            border: 8px solid #111827;
+        }
+
+        .highlight {
+            animation: highlightPulse 1.4s ease-in-out 2;
+            box-shadow: 0 0 0 12px rgba(234, 179, 8, 0.7) !important;
+        }
+
+        @keyframes highlightPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.9); }
+            50% { box-shadow: 0 0 0 25px rgba(234, 179, 8, 0); }
+        }
+
+        .velvet-table {
+            background: radial-gradient(circle at center, #2a1a1f 0%, #1a0f14 70%);
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.95);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-amber-100">
+    <div class="max-w-6xl mx-auto px-6 py-12">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-12">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-gradient-to-br from-red-700 to-rose-600 rounded-2xl flex items-center justify-center text-4xl shadow-2xl">🃏</div>
+                <div>
+                    <h1 class="title text-6xl font-bold tracking-tighter text-white">RED CARD</h1>
+                    <p class="text-red-400 text-xl -mt-2">PREDICTION</p>
+                </div>
+            </div>
+            
+            <div id="api-key-section" class="flex items-center gap-3 bg-zinc-900 px-6 py-3 rounded-3xl">
+                <input id="gemini-key" type="password" placeholder="Gemini API Key" 
+                       class="bg-transparent border border-zinc-700 focus:border-red-500 px-5 py-3 rounded-2xl text-sm outline-none w-80 font-mono">
+                <button onclick="saveApiKey()" 
+                        class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-2xl text-sm font-medium transition-all active:scale-95">
+                    SPEICHERN
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-10">
+            <!-- Magic Table -->
+            <div class="col-span-12 lg:col-span-7">
+                <div class="velvet-table rounded-3xl p-10 border border-amber-900/30">
+                    <div class="text-center mb-8">
+                        <div class="inline-flex bg-black/70 px-8 py-3 rounded-full text-sm tracking-widest text-amber-300">
+                            <i class="fas fa-table mr-2"></i> DER MAGISCHE TISCH
+                        </div>
+                    </div>
+
+                    <div id="cards" class="flex justify-center gap-8 flex-wrap"></div>
+
+                    <div class="mt-16 flex justify-center">
+                        <div class="text-center">
+                            <p class="text-amber-300/70 text-sm mb-4 tracking-widest">WÄHLE DEINE ZAHL (1–6)</p>
+                            <div id="number-pad" class="grid grid-cols-6 gap-4 max-w-xs mx-auto"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Magician's Scroll -->
+            <div class="col-span-12 lg:col-span-5">
+                <div class="bg-zinc-900/90 border border-amber-900/50 rounded-3xl p-8 h-full flex flex-col">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="text-5xl">🔮</div>
+                        <div class="title text-4xl font-bold text-white">Der Magier spricht</div>
+                    </div>
+
+                    <div id="speech-scroll" 
+                         class="flex-1 bg-black/70 border border-amber-800/50 rounded-2xl p-8 text-lg leading-relaxed overflow-auto min-h-[260px] italic">
+                        Gib deinen Gemini API-Key ein und wähle eine Zahl, um das Wunder zu erleben...
+                    </div>
+
+                    <button onclick="resetTrick()" 
+                            class="mt-8 w-full py-4 bg-zinc-800 hover:bg-zinc-700 transition-colors rounded-2xl text-sm font-medium flex items-center justify-center gap-3">
+                        <i class="fas fa-rotate"></i>
+                        TRICK NEU STARTEN
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 text-center text-xs text-amber-400/60">
+            Equivoque • Magician's Choice • Immer die rote Karte<br>
+            Karte 1 (Ass♠) = roter Rücken • Karte 3 (Herz 6) = rotes Gesicht
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
+
+        let genAI = null;
+        let apiKey = localStorage.getItem("geminiKey") || "";
+
+        const cardsState = [
+            { id: 1, value: "A", suit: "♠", face: "black", back: "red" },
+            { id: 2, value: "2", suit: "♠", face: "black", back: "blue" },
+            { id: 3, value: "6", suit: "♥", face: "red",   back: "blue" },
+            { id: 4, value: "5", suit: "♠", face: "black", back: "blue" },
+            { id: 5, value: "3", suit: "♠", face: "black", back: "blue" },
+            { id: 6, value: "4", suit: "♠", face: "black", back: "blue" }
+        ];
+
+        function initGemini() {
+            if (apiKey && !genAI) {
+                genAI = new GoogleGenerativeAI(apiKey);
+                document.getElementById("api-key-section").style.opacity = "0.6";
+            }
+        }
+
+        window.saveApiKey = function() {
+            const input = document.getElementById("gemini-key");
+            apiKey = input.value.trim();
+            if (apiKey.length > 10) {
+                localStorage.setItem("geminiKey", apiKey);
+                initGemini();
+                alert("✅ Gemini API-Key gespeichert!\n\nDer Magier ist nun bereit.");
+            } else {
+                alert("Bitte einen gültigen Gemini API-Key eingeben.");
+            }
+        };
+
+        function createCard(card) {
+            const div = document.createElement("div");
+            div.className = "card";
+            div.id = `card-${card.id}`;
+            
+            div.innerHTML = `
+                <div class="card-inner">
+                    <div class="card-back ${card.back === 'red' ? 'red' : ''}">
+                        <div class="text-5xl font-black tracking-widest opacity-20">RED</div>
+                    </div>
+                    <div class="card-front">
+                        <div class="text-8xl ${card.face === 'red' ? 'text-red-600' : 'text-black'}">${card.suit}</div>
+                        <div class="absolute top-5 left-5 text-4xl font-bold ${card.face === 'red' ? 'text-red-600' : 'text-zinc-900'}">${card.value}</div>
+                        <div class="absolute bottom-5 right-5 text-4xl font-bold rotate-180 ${card.face === 'red' ? 'text-red-600' : 'text-zinc-900'}">${card.value}</div>
+                    </div>
+                </div>
+            `;
+            return div;
+        }
+
+        function renderCards() {
+            const container = document.getElementById("cards");
+            container.innerHTML = "";
+            cardsState.forEach(card => container.appendChild(createCard(card)));
+        }
+
+        function renderNumberPad() {
+            const container = document.getElementById("number-pad");
+            container.innerHTML = "";
+            for (let i = 1; i <= 6; i++) {
+                const btn = document.createElement("button");
+                btn.className = `aspect-square bg-zinc-900 hover:bg-red-900 border border-amber-800 hover:border-red-500 text-4xl font-bold rounded-2xl transition-all active:scale-95 shadow-inner`;
+                btn.textContent = i;
+                btn.onclick = () => performTrick(i);
+                container.appendChild(btn);
+            }
+        }
+
+        async function performTrick(chosenNumber) {
+            if (!genAI) {
+                alert("Bitte zuerst deinen Gemini API-Key oben eingeben und speichern.");
+                return;
+            }
+
+            // Disable buttons
+            document.querySelectorAll("#number-pad button").forEach(b => b.disabled = true);
+
+            const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+            const prompt = `You are a master magician performing "The Red Card Prediction".
+Spectator chose number ${chosenNumber}.
+
+Cards positions 1 to 6 from left to right:
+- Card 1: Ace of Spades → Red Back
+- Card 3: Six of Hearts → Red Face
+- All others: Blue Back, Black Face
+
+Rules:
+- If number is 1, 2 or 5 → you MUST land on Card 1 (red back)
+- If number is 3, 4 or 6 → you MUST land on Card 3 (red face)
+
+Return ONLY valid JSON (no extra text):
+{
+  "magician_speech": "poetic, mysterious explanation in German",
+  "counting_path": [array of positions 1-6 showing the counting order, last one is the target],
+  "reveal_type": "back" or "face"
+}`;
+
+            try {
+                document.getElementById("speech-scroll").innerHTML = `<span class="text-amber-400">Der Magier denkt nach...</span>`;
+
+                const result = await model.generateContent(prompt);
+                let text = result.response.text().trim();
+
+                // Clean JSON
+                if (text.includes("```json")) text = text.split("```json")[1].split("```")[0];
+                if (text.includes("```")) text = text.split("```")[1];
+
+                const data = JSON.parse(text);
+
+                // Show speech
+                document.getElementById("speech-scroll").innerHTML = `
+                    <span class="text-red-300 block text-xl leading-relaxed">"${data.magician_speech}"</span>
+                    <span class="text-xs text-amber-400 mt-6 block">— Der Magier</span>
+                `;
+
+                // Visual counting
+                await visualCount(data.counting_path);
+
+                // Final reveal
+                await finalReveal(data.reveal_type);
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById("speech-scroll").innerHTML = `
+                    <span class="text-red-400">Etwas ist schiefgelaufen...<br>Versuche es erneut.</span>
+                `;
+            }
+        }
+
+        async function visualCount(path) {
+            for (const pos of path) {
+                const card = document.getElementById(`card-${pos}`);
+                if (card) {
+                    card.classList.add("highlight");
+                    await new Promise(resolve => setTimeout(resolve, 700));
+                    card.classList.remove("highlight");
+                }
+            }
+        }
+
+        async function finalReveal(type) {
+            const allCards = document.querySelectorAll(".card");
+            
+            allCards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add("flipped");
+                }, index * 90);
+            });
+
+            // Glow on red element
+            setTimeout(() => {
+                if (type === "back") {
+                    document.getElementById("card-1").style.boxShadow = "0 0 70px #f87171";
+                } else {
+                    document.getElementById("card-3").style.boxShadow = "0 0 70px #f87171";
+                }
+            }, 1200);
+        }
+
+        window.resetTrick = function() {
+            document.querySelectorAll(".card").forEach(card => {
+                card.classList.remove("flipped");
+                card.style.boxShadow = "";
+            });
+            
+            document.getElementById("speech-scroll").innerHTML = 
+                "Wähle eine Zahl 1–6 und erlebe echte KI-Magie...";
+            
+            document.querySelectorAll("#number-pad button").forEach(b => b.disabled = false);
+        };
+
+        // Initialize everything
+        window.onload = () => {
+            renderCards();
+            renderNumberPad();
+            initGemini();
+
+            if (!apiKey) {
+                document.getElementById("speech-scroll").innerHTML = 
+                    "Willkommen zur <strong>Red Card Prediction</strong>!<br><br>Trage oben deinen Gemini API-Key ein.";
+            }
+        };
+    </script>
+</body>
+</html>               document.getElementById("speech-scroll").innerHTML = 
+                    "Willkommen zur <strong>Red Card Prediction</strong>!<br><br>Trage oben deinen Gemini API-Key ein.";
+            }
+        };
+    </script>
+</body>
+</html>

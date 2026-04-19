@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Red Card Prediction - Gemini Magician</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .card-container { perspective: 1000px; }
+        .card-inner {
+            transition: transform 0.8s;
+            transform-style: preserve-3d;
+            position: relative;
+        }
+        .flipped { transform: rotateY(180deg); }
+        .card-front, .card-back {
+            backface-visibility: hidden;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 0.5rem; border: 2px solid #333;
+        }
+        .card-back { transform: rotateY(180deg); }
+        .bg-card-blue { background: repeating-linear-gradient(45deg, #1e3a8a, #1e3a8a 10px, #2563eb 10px, #2563eb 20px); }
+        .bg-card-red { background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 10px, #dc2626 10px, #dc2626 20px); }
+    </style>
+</head>
+<body class="bg-zinc-900 text-zinc-100 min-h-screen flex flex-col items-center p-8">
+
+    <header class="text-center mb-10">
+        <h1 class="text-4xl font-bold text-red-500 mb-2">Red Card Prediction</h1>
+        <p class="text-zinc-400 italic">"I have predicted your choice. Every path leads to the Red Card."</p>
+    </header>
+
+    <div class="mb-8 w-full max-w-md">
+        <input type="password" id="apiKey" placeholder="Enter Gemini API Key" class="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-sm focus:outline-none focus:border-red-500">
+    </div>
+
+    <div id="cardTable" class="flex flex-wrap justify-center gap-4 mb-12">
+        </div>
+
+    <div class="flex flex-col items-center gap-6">
+        <div class="flex gap-2">
+            <input type="number" id="userChoice" min="1" max="6" placeholder="Choose 1-6" class="p-3 bg-zinc-800 border border-zinc-700 rounded w-32 text-center text-xl font-bold focus:outline-none focus:border-red-500">
+            <button onclick="performTrick()" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded font-bold transition">Consult the Magician</button>
+        </div>
+
+        <div id="magicianSpeech" class="max-w-xl bg-zinc-800 p-6 rounded-lg border-l-4 border-red-600 hidden">
+            <p id="geminiOutput" class="italic text-lg text-zinc-300"></p>
+        </div>
+    </div>
+
+    <script>
+        // Internal data structure mapping to the Source logic
+        // Layout: [Pik 4, Pik Ass, Herz 6, Pik 5, Pik 3, Pik 2] 
+        // Note: Modified slightly for a logical 1-6 visual row
+        const cardsData = [
+            { id: 1, name: "Ace of Spades", face: "♠ A", color: "black", back: "red" },
+            { id: 2, name: "2 of Spades", face: "♠ 2", color: "black", back: "blue" },
+            { id: 3, name: "6 of Hearts", face: "♥ 6", color: "red", back: "blue" },
+            { id: 4, name: "5 of Spades", face: "♠ 5", color: "black", back: "blue" },
+            { id: 5, name: "3 of Spades", face: "♠ 3", color: "black", back: "blue" },
+            { id: 6, name: "4 of Spades", face: "♠ 4", color: "black", back: "blue" }
+        ];
+
+        function initCards() {
+            const container = document.getElementById('cardTable');
+            container.innerHTML = '';
+            cardsData.forEach((card, index) => {
+                container.innerHTML += `
+                    <div class="card-container w-24 h-36" id="card-${index + 1}">
+                        <div class="card-inner w-full h-full relative" id="inner-${index + 1}">
+                            <div class="card-front ${card.back === 'red' ? 'bg-card-red' : 'bg-card-blue'}"></div>
+                            <div class="card-back bg-white text-3xl font-bold ${card.color === 'red' ? 'text-red-600' : 'text-black'}">
+                                ${card.face}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function performTrick() {
+            const num = parseInt(document.getElementById('userChoice').value);
+            const apiKey = document.getElementById('apiKey').value;
+            const outputDiv = document.getElementById('magicianSpeech');
+            const outputText = document.getElementById('geminiOutput');
+
+            if (!num || num < 1 || num > 6) return alert("Pick a number between 1 and 6");
+            if (!apiKey) return alert("Please enter your Gemini API Key to let the Magician speak.");
+
+            outputText.innerText = "The Magician is contemplating your fate...";
+            outputDiv.classList.remove('hidden');
+
+            // Gemini Prompting Logic based on Source Outs
+            const prompt = `Act as a mysterious Master Magician. The user chose the number ${num}. 
+            Explain the logic of landing on the 'Red Card' based on these rules:
+            - If 1 or 2: Lead them to the Ace of Spades (Position 1). Explain that while the face is black, its BACK is the only red back in the set.
+            - If 3 or 4: Lead them to the 6 of Hearts (Position 3). Explain that while others are black Spades, this is the only Red Faced card.
+            - If 5: Count from the right (6, 5) to land on the Ace of Spades. Mention the Red Back.
+            - If 6: Reveal all cards. Show that in a sequence of 1-5, your number 6 (The Heart) is the only Red Card.
+            Be concise, atmospheric, and justify why ${num} was the inevitable choice.`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                
+                const data = await response.json();
+                const explanation = data.candidates[0].content.parts[0].text;
+                
+                outputText.innerText = explanation;
+                revealResult(num);
+            } catch (err) {
+                outputText.innerText = "The mystical energies are blocked. Check your API key.";
+            }
+        }
+
+        function revealResult(n) {
+            // Logic to flip specific cards based on the Equivoke outcome
+            document.querySelectorAll('.card-inner').forEach(c => c.classList.remove('flipped'));
+            
+            setTimeout(() => {
+                if (n === 1 || n === 2 || n === 5) {
+                    // Target Ace (Pos 1) - Reveal its Red Back (In this UI, 'front' is back)
+                    // Just lift/highlight it.
+                    document.getElementById('card-1').classList.add('-translate-y-4', 'ring-4', 'ring-red-500');
+                } else {
+                    // Target 6 of Hearts (Pos 3) - Flip to show Red Face
+                    document.getElementById('inner-3').classList.add('flipped');
+                    document.getElementById('card-3').classList.add('-translate-y-4', 'ring-4', 'ring-red-500');
+                }
+            }, 500);
+        }
+
+        initCards();
+    </script>
+</body>
+</html>

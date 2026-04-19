@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Red Card Prediction</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at center, #0f172a, #020617);
+    }
+
+    .card {
+      perspective: 1000px;
+    }
+
+    .card-inner {
+      transition: transform 0.8s;
+      transform-style: preserve-3d;
+      position: relative;
+    }
+
+    .flipped .card-inner {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      backface-visibility: hidden;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.5rem;
+    }
+
+    .card-back {
+      background: linear-gradient(135deg, #1e3a8a, #2563eb);
+    }
+
+    .card-front {
+      background: #f8fafc;
+      transform: rotateY(180deg);
+    }
+
+    .red {
+      color: #dc2626;
+    }
+
+    .black {
+      color: #020617;
+    }
+  </style>
+</head>
+<body class="text-white min-h-screen flex flex-col items-center justify-center p-6">
+
+  <h1 class="text-3xl font-bold mb-4">🔮 Red Card Prediction</h1>
+
+  <p id="intro" class="text-center mb-6 opacity-80">Loading prediction...</p>
+
+  <!-- Cards -->
+  <div id="cards" class="grid grid-cols-6 gap-4 mb-8"></div>
+
+  <!-- Controls -->
+  <div class="flex gap-4 mb-4">
+    <button id="rollBtn" class="px-4 py-2 bg-indigo-600 rounded-xl hover:bg-indigo-500">
+      🎲 Roll
+    </button>
+    <span id="result" class="text-xl"></span>
+  </div>
+
+  <p id="justification" class="mb-4 italic opacity-80"></p>
+
+  <button id="revealBtn" class="hidden px-6 py-2 bg-red-600 rounded-xl hover:bg-red-500">
+    Reveal
+  </button>
+
+  <p id="final" class="mt-6 text-lg"></p>
+
+<script type="module">
+import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+const API_KEY = "AIzaSyAy3JxIDx-QvCDfMm3AbexnG6_-L0IKJMY";
+
+const genAI = new GoogleGenerativeAI(API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+/* =========================
+   CARD SETUP (FIXED STACK)
+   Positions 1–6
+========================= */
+
+const deck = [
+  { label: "4♠", face: "black", back: "blue" }, // 1
+  { label: "A♠", face: "black", back: "red"  }, // 2 (ACE special)
+  { label: "6♥", face: "red",   back: "blue" }, // 3 (HEART special)
+  { label: "5♠", face: "black", back: "blue" }, // 4
+  { label: "3♠", face: "black", back: "blue" }, // 5
+  { label: "2♠", face: "black", back: "blue" }  // 6
+];
+
+const cardsEl = document.getElementById("cards");
+const introEl = document.getElementById("intro");
+const justificationEl = document.getElementById("justification");
+const finalEl = document.getElementById("final");
+const resultEl = document.getElementById("result");
+
+let chosenNumber = null;
+let targetIndex = null; // ALWAYS force outcome
+
+/* =========================
+   UI RENDER
+========================= */
+
+function renderCards() {
+  cardsEl.innerHTML = "";
+  deck.forEach((card, i) => {
+    const div = document.createElement("div");
+    div.className = "card w-24 h-36";
+
+    div.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-back"></div>
+        <div class="card-face card-front ${card.face === 'red' ? 'red' : 'black'}">
+          ${card.label}
+        </div>
+      </div>
+    `;
+    cardsEl.appendChild(div);
+  });
+}
+
+function flipAll() {
+  document.querySelectorAll(".card").forEach(c => c.classList.add("flipped"));
+}
+
+/* =========================
+   GEMINI CALL
+========================= */
+
+async function askGemini(prompt) {
+  try {
+    const res = await model.generateContent(prompt);
+    return res.response.text();
+  } catch (e) {
+    return "...the connection to the unseen falters...";
+  }
+}
+
+/* =========================
+   MAGIC LOGIC (EQUIVOQUE)
+========================= */
+
+function decideOutcome(n) {
+  // Outs:
+  // 1,2,5 → ACE (index 1)
+  // 3,4,6 → HEART 6 (index 2)
+
+  if ([1,2,5].includes(n)) {
+    targetIndex = 1; // Ace
+  } else {
+    targetIndex = 2; // 6♥
+  }
+}
+
+/* =========================
+   FLOW
+========================= */
+
+document.getElementById("rollBtn").onclick = async () => {
+  chosenNumber = Math.floor(Math.random() * 6) + 1;
+  resultEl.textContent = "You chose: " + chosenNumber;
+
+  decideOutcome(chosenNumber);
+
+  justificationEl.textContent = "Consulting the unseen...";
+
+  const text = await askGemini(
+    `The spectator chose number ${chosenNumber}. 
+     Give a short mystical justification why we count to that card, 
+     then instruct them to click reveal.`
+  );
+
+  justificationEl.textContent = text;
+  document.getElementById("revealBtn").classList.remove("hidden");
+};
+
+document.getElementById("revealBtn").onclick = async () => {
+  flipAll();
+
+  let outcomeText = "";
+
+  if (targetIndex === 1) {
+    outcomeText = "The user found the only red-backed card.";
+  } else {
+    outcomeText = "The user found the only red face card among black cards.";
+  }
+
+  const finalText = await askGemini(
+    `${outcomeText} Provide a dramatic triumphant mentalist conclusion.`
+  );
+
+  finalEl.textContent = finalText;
+};
+
+/* =========================
+   INTRO
+========================= */
+
+async function init() {
+  renderCards();
+
+  const intro = await askGemini(
+    "Generate a short mysterious mentalist greeting and a cryptic prediction sentence."
+  );
+
+  introEl.textContent = intro;
+}
+
+init();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Red Card Prediction</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
+
+  :root {
+    --card-w: 90px;
+    --card-h: 130px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: #0a0a12;
+    color: #e8dcc8;
+    font-family: 'Lato', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .title-font { font-family: 'Cinzel', serif; }
+
+  .stars {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 70%, rgba(255,255,255,0.35) 0%, transparent 100%),
+      radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,0.25) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(2px 2px at 35% 15%, rgba(255,255,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 65% 90%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 15% 50%, rgba(255,255,255,0.2) 0%, transparent 100%);
+  }
+
+  .mystical-border {
+    border: 1px solid rgba(180, 140, 80, 0.3);
+    box-shadow: 0 0 30px rgba(180, 140, 80, 0.08), inset 0 0 30px rgba(0,0,0,0.5);
+  }
+
+  .gold { color: #c9a84c; }
+  .gold-dim { color: #8a6e30; }
+
+  .scene {
+    perspective: 1000px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .card-slot {
+    width: var(--card-w);
+    height: var(--card-h);
+  }
+
+  .card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+  }
+
+  .card-inner.flipped {
+    transform: rotateY(180deg);
+  }
+
+  .card-face, .card-back-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+
+  .card-back-face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+
+  .back-blue {
+    background: #1a237e;
+    background-image: repeating-linear-gradient(
+      45deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px,
+      transparent 1px, transparent 8px
+    );
+    border-color: rgba(100,130,220,0.4);
+  }
+
+  .back-red {
+    background: #7f0000;
+    background-image: repeating-linear-gradient(
+      45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px,
+      transparent 1px, transparent 8px
+    );
+    border-color: rgba(220,80,80,0.5);
+  }
+
+  .card-face {
+    transform: rotateY(180deg);
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+  }
+
+  .face-white {
+    background: #f8f5ef;
+    color: #1a1a1a;
+  }
+
+  .face-red-suit {
+    color: #c0392b !important;
+  }
+
+  .face-black-suit {
+    color: #1a1a1a;
+  }
+
+  .suit-symbol {
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  .card-value {
+    font-size: 13px;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .selected-highlight .card-back-face {
+    box-shadow: 0 0 18px rgba(201, 168, 76, 0.7);
+    border-color: rgba(201, 168, 76, 0.8) !important;
+  }
+
+  .die-btn {
+    width: 52px; height: 52px;
+    background: #1a1a2e;
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    border-radius: 10px;
+    color: #c9a84c;
+    font-size: 22px;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .die-btn:hover {
+    background: #252540;
+    border-color: rgba(201, 168, 76, 0.8);
+    transform: scale(1.08);
+    box-shadow: 0 0 12px rgba(201, 168, 76, 0.3);
+  }
+
+  .die-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .gemini-box {
+    background: rgba(10, 8, 20, 0.8);
+    border: 1px solid rgba(180, 140, 80, 0.25);
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-style: italic;
+    color: #c9b077;
+    min-height: 60px;
+    position: relative;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .gemini-box::before {
+    content: '"';
+    position: absolute;
+    top: 4px; left: 12px;
+    font-size: 40px;
+    color: rgba(201, 168, 76, 0.2);
+    font-family: 'Cinzel', serif;
+    line-height: 1;
+  }
+
+  .prediction-scroll {
+    background: #f5ead0;
+    color: #3a2a10;
+    border-radius: 6px;
+    padding: 12px 18px;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    border: 1px solid #c4a060;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 0 12px rgba(180,140,60,0.1);
+    position: relative;
+    text-align: center;
+  }
+
+  .prediction-scroll::before,
+  .prediction-scroll::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 8px;
+    background: #c4a060;
+    border-radius: 3px;
+  }
+
+  .prediction-scroll::before { top: 0; }
+  .prediction-scroll::after { bottom: 0; }
+
+  .pulse-anim {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
+  .typewriter-cursor::after {
+    content: '|';
+    animation: blink 0.8s step-end infinite;
+    color: #c9a84c;
+    margin-left: 1px;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  .reveal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.15) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .step-indicator {
+    display: flex; gap: 8px;
+  }
+
+  .step-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: rgba(201,168,76,0.2);
+    transition: all 0.3s;
+  }
+
+  .step-dot.active {
+    background: #c9a84c;
+    box-shadow: 0 0 8px rgba(201,168,76,0.5);
+  }
+
+  #resetBtn {
+    background: transparent;
+    border: 1px solid rgba(201,168,76,0.4);
+    color: #c9a84c;
+    padding: 10px 28px;
+    border-radius: 6px;
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  #resetBtn:hover {
+    background: rgba(201,168,76,0.1);
+    border-color: rgba(201,168,76,0.7);
+  }
+
+  .loading-dots span {
+    animation: dotFade 1.4s infinite;
+    color: #c9a84c;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes dotFade {
+    0%, 80%, 100% { opacity: 0.2; }
+    40% { opacity: 1; }
+  }
+
+  .reveal-card {
+    background: rgba(15,10,30,0.95);
+    border: 1px solid rgba(201,168,76,0.4);
+    border-radius: 16px;
+    padding: 28px 32px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .big-red-suit {
+    font-size: 64px;
+    color: #e74c3c;
+    line-height: 1;
+    margin: 8px 0;
+  }
+
+  @media (max-width: 500px) {
+    :root { --card-w: 70px; --card-h: 105px; }
+    .scene { gap: 8px; }
+    .suit-symbol { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stars"></div>
+
+<div class="relative z-10 max-w-2xl mx-auto px-4 py-8">
+
+  <div class="text-center mb-8">
+    <h1 class="title-font text-3xl md:text-4xl gold mb-1 tracking-widest">THE RED CARD</h1>
+    <p class="title-font text-sm gold-dim tracking-[0.3em] uppercase">Prediction</p>
+    <div class="step-indicator justify-center mt-4">
+      <div class="step-dot active" id="dot0"></div>
+      <div class="step-dot" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+    </div>
+  </div>
+
+  <div class="mystical-border rounded-2xl p-6 mb-6 bg-black bg-opacity-40">
+    <div class="gemini-box mb-5" id="geminiMsg">
+      <div class="loading-dots pl-4"><span>●</span><span>●</span><span>●</span></div>
+    </div>
+
+    <div class="prediction-scroll mb-6" id="predictionScroll">
+      <div class="pt-1 pb-1">You will choose the only red card.</div>
+    </div>
+
+    <div class="scene mb-6" id="cardScene"></div>
+
+    <div id="numberSection" class="text-center" style="display:none;">
+      <p class="title-font text-xs gold-dim tracking-widest mb-4 uppercase">Choose a number — 1 through 6</p>
+      <div class="flex justify-center gap-3 flex-wrap">
+        <button class="die-btn" onclick="pickNumber(1)">1</button>
+        <button class="die-btn" onclick="pickNumber(2)">2</button>
+        <button class="die-btn" onclick="pickNumber(3)">3</button>
+        <button class="die-btn" onclick="pickNumber(4)">4</button>
+        <button class="die-btn" onclick="pickNumber(5)">5</button>
+        <button class="die-btn" onclick="pickNumber(6)">6</button>
+      </div>
+    </div>
+
+    <div id="revealSection" class="text-center" style="display:none;">
+      <div class="gemini-box mb-4" id="justificationMsg">
+        <div class="loading-dots pl-4"><span>●</span><span>●</span><span>●</span></div>
+      </div>
+      <button onclick="doReveal()" id="revealBtn"
+        class="title-font tracking-widest text-sm px-8 py-3 rounded-lg"
+        style="background: rgba(180,30,30,0.25); border:1px solid rgba(220,60,60,0.5); color:#e88; cursor:pointer; transition:all 0.2s;"
+        onmouseover="this.style.background='rgba(180,30,30,0.45)'"
+        onmouseout="this.style.background='rgba(180,30,30,0.25)'">
+        ✦ REVEAL ✦
+      </button>
+    </div>
+
+    <div id="endSection" class="text-center" style="display:none;">
+      <div class="gemini-box mb-4" id="conclusionMsg">
+        <div class="loading-dots pl-4"><span>●</span><span>●</span><span>●</span></div>
+      </div>
+      <button id="resetBtn" onclick="resetTrick()">✦ Begin Again ✦</button>
+    </div>
+  </div>
+
+  <p class="text-center text-xs opacity-20 title-font tracking-widest">Magie — Die Kunst des Zauberns &nbsp;·&nbsp; Nov 2008</p>
+</div>
+
+<script type="module">
+const API_KEY = 'AIzaSyAy3JxIDx-QvCDfMm3AbexnG6_-L0IKJMY';
+
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+
+async function askGemini(prompt) {
+  try {
+    const res = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 150, temperature: 1.0 }
+      })
+    });
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  } catch(e) {
+    return '';
+  }
+}
+
+function typewrite(el, text, speed=28) {
+  el.textContent = '';
+  el.classList.add('typewriter-cursor');
+  let i = 0;
+  const t = setInterval(() => {
+    el.textContent += text[i++];
+    if (i >= text.length) { clearInterval(t); el.classList.remove('typewriter-cursor'); }
+  }, speed);
+}
+
+const CARDS = [
+  { id: 0, value: '4', suit: '♠', back: 'blue', faceColor: 'black', faceUp: false },
+  { id: 1, value: 'A', suit: '♠', back: 'red',  faceColor: 'black', faceUp: true  },
+  { id: 2, value: '6', suit: '♥', back: 'blue', faceColor: 'red',   faceUp: false },
+  { id: 3, value: '5', suit: '♠', back: 'blue', faceColor: 'black', faceUp: true  },
+  { id: 4, value: '3', suit: '♠', back: 'blue', faceColor: 'black', faceUp: false },
+  { id: 5, value: '2', suit: '♠', back: 'blue', faceColor: 'black', faceUp: true  },
+];
+
+let state = {
+  chosenNumber: null,
+  targetCardIndex: null,
+  revealType: null,
+};
+
+function buildScene() {
+  const scene = document.getElementById('cardScene');
+  scene.innerHTML = '';
+  CARDS.forEach((card, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'card-slot';
+    slot.id = `slot-${i}`;
+
+    const inner = document.createElement('div');
+    inner.className = 'card-inner';
+    inner.id = `card-${i}`;
+    if (card.faceUp) inner.classList.add('flipped');
+
+    const backFace = document.createElement('div');
+    backFace.className = `card-back-face back-${card.back}`;
+    backFace.innerHTML = card.back === 'red'
+      ? `<svg width="36" height="36" viewBox="0 0 36 36"><path d="M18 4 L22 14 L33 14 L24 21 L27 32 L18 25 L9 32 L12 21 L3 14 L14 14 Z" fill="rgba(255,100,100,0.25)" stroke="rgba(255,100,100,0.4)" stroke-width="1"/></svg>`
+      : `<svg width="36" height="36" viewBox="0 0 36 36"><path d="M18 4 L22 14 L33 14 L24 21 L27 32 L18 25 L9 32 L12 21 L3 14 L14 14 Z" fill="rgba(100,130,220,0.2)" stroke="rgba(100,130,220,0.35)" stroke-width="1"/></svg>`;
+
+    const frontFace = document.createElement('div');
+    frontFace.className = `card-face face-white`;
+
+    const suitColor = card.faceColor === 'red' ? 'face-red-suit' : 'face-black-suit';
+    frontFace.innerHTML = `
+      <div class="card-value ${suitColor}">${card.value}</div>
+      <div class="suit-symbol ${suitColor}">${card.suit}</div>
+    `;
+
+    inner.appendChild(backFace);
+    inner.appendChild(frontFace);
+    slot.appendChild(inner);
+    scene.appendChild(slot);
+  });
+}
+
+function getEquivoque(n) {
+  if (n === 1 || n === 2 || n === 5) {
+    return { targetCardIndex: 1, revealType: 'red-back' };
+  } else {
+    return { targetCardIndex: 2, revealType: 'red-face' };
+  }
+}
+
+window.pickNumber = async function(n) {
+  document.querySelectorAll('.die-btn').forEach(b => b.disabled = true);
+
+  state.chosenNumber = n;
+  const eq = getEquivoque(n);
+  state.targetCardIndex = eq.targetCardIndex;
+  state.revealType = eq.revealType;
+
+  document.getElementById('dot1').classList.add('active');
+
+  document.getElementById('numberSection').style.display = 'none';
+  document.getElementById('revealSection').style.display = 'block';
+
+  const justEl = document.getElementById('justificationMsg');
+  justEl.innerHTML = '<div class="loading-dots pl-4"><span>●</span><span>●</span><span>●</span></div>';
+
+  const prompt = `You are a theatrical stage mentalist performing a prediction card trick. The spectator chose the number ${n}. In exactly ONE sentence (max 20 words), give a mystical or psychological 'reason' why their mind was drawn to that number. Be cryptic, poetic, and theatrical. Then end with: "Now... click Reveal." Do not use quotation marks.`;
+
+  const text = await askGemini(prompt);
+  if (text) {
+    typewrite(justEl, text);
+  } else {
+    justEl.textContent = `The number ${n}... precisely the vibration I anticipated. Now... click Reveal.`;
+  }
+
+  const slot = document.getElementById(`slot-${state.targetCardIndex}`);
+  slot.querySelector('.card-inner').classList.add('selected-highlight');
+}
+
+window.doReveal = async function() {
+  document.getElementById('revealBtn').disabled = true;
+  document.getElementById('dot2').classList.add('active');
+
+  if (state.revealType === 'red-back') {
+    revealRedBack();
+  } else {
+    revealRedFace();
+  }
+
+  document.getElementById('revealSection').style.display = 'none';
+  document.getElementById('endSection').style.display = 'block';
+
+  const conclusionEl = document.getElementById('conclusionMsg');
+  conclusionEl.innerHTML = '<div class="loading-dots pl-4"><span>●</span><span>●</span><span>●</span></div>';
+
+  const resultDesc = state.revealType === 'red-back'
+    ? 'the spectator found the Ace of Spades — the only card with a RED back among all blue-backed cards'
+    : 'the spectator found the 6 of Hearts — the only red-faced card among all black-faced cards';
+
+  const prompt = `You are a triumphant stage mentalist. The trick just succeeded perfectly: ${resultDesc}. Give ONE theatrical, triumphant concluding remark (max 25 words). Be dramatic and celebratory. No quotation marks.`;
+
+  const text = await askGemini(prompt);
+  if (text) {
+    setTimeout(() => typewrite(conclusionEl, text), 800);
+  } else {
+    conclusionEl.textContent = 'The universe never lies. It never does.';
+  }
+}
+
+function revealRedBack() {
+  CARDS.forEach((card, i) => {
+    const inner = document.getElementById(`card-${i}`);
+    inner.classList.remove('selected-highlight');
+    if (card.faceUp) {
+      setTimeout(() => inner.classList.remove('flipped'), i * 120);
+    }
+    if (i === 2 || i === 4) {
+      setTimeout(() => inner.classList.add('flipped'), i * 120);
+    }
+  });
+  setTimeout(() => {
+    document.getElementById(`card-1`).classList.add('selected-highlight');
+  }, 900);
+}
+
+function revealRedFace() {
+  CARDS.forEach((card, i) => {
+    const inner = document.getElementById(`card-${i}`);
+    inner.classList.remove('selected-highlight');
+    if (!card.faceUp) {
+      setTimeout(() => inner.classList.add('flipped'), i * 130);
+    }
+  });
+  setTimeout(() => {
+    document.getElementById(`card-2`).classList.add('selected-highlight');
+  }, 900);
+}
+
+window.resetTrick = function() {
+  state = { chosenNumber: null, targetCardIndex: null, revealType: null };
+  document.getElementById('numberSection').style.display = 'block';
+  document.getElementById('revealSection').style.display = 'none';
+  document.getElementById('endSection').style.display = 'none';
+  document.querySelectorAll('.die-btn').forEach(b => b.disabled = false);
+  document.querySelectorAll('.step-dot').forEach((d,i) => {
+    if (i === 0) d.classList.add('active'); else d.classList.remove('active');
+  });
+  buildScene();
+  loadIntro();
+}
+
+async function loadIntro() {
+  const msgEl = document.getElementById('geminiMsg');
+  msgEl.innerHTML = '<div class="loading-dots pl-4"><span>●</span><span>●</span><span>●</span></div>';
+
+  const prompt = `You are a mysterious stage mentalist beginning a prediction card trick. Generate a short atmospheric greeting (1-2 sentences, max 30 words total). Include a cryptic hint that you already know what the spectator will choose. Be theatrical, poetic, slightly eerie. No quotation marks.`;
+
+  const text = await askGemini(prompt);
+  if (text) {
+    typewrite(msgEl, text);
+  } else {
+    msgEl.textContent = 'Before you even decide... I already know. The cards have told me everything.';
+  }
+
+  document.getElementById('numberSection').style.display = 'block';
+}
+
+buildScene();
+loadIntro();
+</script>
+</body>
+</html>
